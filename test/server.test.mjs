@@ -37,7 +37,7 @@ test("enforces request body size limits", async () => {
   }
 });
 
-test("converts Responses requests and synthetic streams converted output", async () => {
+test("streams upstream chat completions into Responses SSE events", async () => {
   let upstreamBody;
   const shim = await listen(
     createShimServer(
@@ -49,11 +49,18 @@ test("converts Responses requests and synthetic streams converted output", async
         fetch: async (url, init) => {
           upstreamBody = JSON.parse(init.body);
           assert.equal(url, "https://upstream.example/v1/openai/chat/completions");
-          return jsonFetchResponse(200, {
-            model: upstreamBody.model,
-            choices: [{ message: { role: "assistant", content: "OK" } }],
-            usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
-          });
+          return sseFetchResponse([
+            {
+              id: "chatcmpl_1",
+              model: upstreamBody.model,
+              choices: [{ delta: { role: "assistant", content: "O" } }],
+            },
+            {
+              id: "chatcmpl_1",
+              model: upstreamBody.model,
+              choices: [{ delta: { content: "K" }, finish_reason: "stop" }],
+            },
+          ]);
         },
       }
     )
@@ -69,9 +76,73 @@ test("converts Responses requests and synthetic streams converted output", async
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.headers["content-type"], "text/event-stream");
+    assert.equal(upstreamBody.stream, true);
     assert.deepEqual(upstreamBody.messages, [{ role: "user", content: "Hello" }]);
+    assert.match(response.body, /event: response\.output_text\.delta/);
+    assert.match(response.body, /"delta":"O"/);
+    assert.match(response.body, /"delta":"K"/);
     assert.match(response.body, /event: response\.completed/);
     assert.match(response.body, /data: \[DONE\]/);
+  } finally {
+    await shim.close();
+  }
+});
+
+test("accumulates streaming tool call fragments before emitting function calls", async () => {
+  const shim = await listen(
+    createShimServer(
+      { upstream: "https://upstream.example/v1/openai", logLevel: "silent" },
+      {
+        fetch: async () =>
+          sseFetchResponse([
+            {
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: "call_1",
+                        type: "function",
+                        function: { name: "exec", arguments: "{\"cmd\":\"p" },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+            {
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: 0,
+                        function: { arguments: "wd\"}" },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ]),
+      }
+    )
+  );
+
+  try {
+    const response = await request({
+      port: shim.port,
+      path: "/v1/responses",
+      method: "POST",
+      body: JSON.stringify({ model: "model", input: "Hello" }),
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /"type":"function_call"/);
+    assert.match(response.body, /"call_id":"call_1"/);
+    assert.match(response.body, /"name":"exec"/);
+    assert.match(response.body, /"arguments":"{\\\"cmd\\\":\\\"pwd\\\"}"/);
   } finally {
     await shim.close();
   }
@@ -175,6 +246,14 @@ function jsonFetchResponse(status, body) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json" },
+  });
+}
+
+function sseFetchResponse(chunks) {
+  const body = chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("") + "data: [DONE]\n\n";
+  return new Response(body, {
+    status: 200,
+    headers: { "content-type": "text/event-stream" },
   });
 }
 

@@ -107,15 +107,16 @@ node bin/deepinfra-codex-shim.js \
 - Function tools used by Codex CLI
 - `function_call` items
 - `function_call_output` items
-- Non-streaming upstream DeepInfra requests
-- Synthetic Responses-style SSE events when Codex requests streaming
+- Non-streaming Responses JSON when Codex sends `stream: false`
+- DeepInfra streaming chat completions when Codex requests streaming
+- Responses-style SSE text deltas for streamed text output
+- Streamed tool-call fragments accumulated into complete Responses `function_call` items
 
 ## Known limitations
 
 This does not support:
 
 - Full Responses API compatibility
-- Real upstream streaming
 - Images
 - Audio
 - Built-in OpenAI tools
@@ -127,6 +128,8 @@ This does not support:
 - Provider-specific model quirks
 
 DeepInfra models differ in tool-call behavior. If a model does not reliably emit OpenAI-compatible tool calls, this shim cannot fix that at the transport layer.
+
+For streamed tool calls, chat completions providers send function names and arguments in fragments. The shim accumulates those fragments and emits the complete Responses `function_call` item when the upstream stream finishes.
 
 ## Compatibility flags
 

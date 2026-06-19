@@ -1,6 +1,7 @@
 import http from "node:http";
 import { DEFAULT_CONFIG } from "./config.mjs";
-import { convertChatCompletion, createSyntheticSseEvents, formatSseEvent } from "./chat-to-responses.mjs";
+import { convertChatCompletion } from "./chat-to-responses.mjs";
+import { writeChatCompletionStreamAsResponses } from "./chat-stream-to-responses.mjs";
 import { convertResponsesRequest } from "./responses-to-chat.mjs";
 import { createLogger, redactText } from "./logging.mjs";
 
@@ -96,6 +97,8 @@ export async function startServer(config, dependencies = {}) {
 async function handleResponses({ request, response, requestId, config, fetchImpl, logger }) {
   const body = await readJsonBody(request, config.maxBodyBytes);
   const chatBody = convertResponsesRequest(body);
+  const wantsStream = body.stream !== false;
+  chatBody.stream = wantsStream;
 
   if (config.logRequests) {
     logger.info({
@@ -128,12 +131,28 @@ async function handleResponses({ request, response, requestId, config, fetchImpl
     fetchImpl,
   });
 
-  const upstreamText = await upstreamResponse.text();
   if (!upstreamResponse.ok) {
+    const upstreamText = await upstreamResponse.text();
     handleUpstreamError({ response, requestId, upstreamResponse, upstreamText, logger });
     return;
   }
 
+  if (wantsStream) {
+    response.writeHead(200, {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      connection: "keep-alive",
+    });
+    await writeChatCompletionStreamAsResponses({
+      upstreamResponse,
+      response,
+      model: chatBody.model,
+      dropToolCallContent: config.compatibilityDropToolCallContent,
+    });
+    return;
+  }
+
+  const upstreamText = await upstreamResponse.text();
   let chatResponse;
   try {
     chatResponse = JSON.parse(upstreamText);
@@ -158,11 +177,6 @@ async function handleResponses({ request, response, requestId, config, fetchImpl
     model: chatBody.model,
     dropToolCallContent: config.compatibilityDropToolCallContent,
   });
-
-  if (body.stream !== false) {
-    writeSseResponse(response, converted);
-    return;
-  }
 
   jsonResponse(response, 200, converted);
 }
@@ -299,20 +313,6 @@ export function jsonResponse(response, status, body) {
     "content-length": Buffer.byteLength(text),
   });
   response.end(text);
-}
-
-function writeSseResponse(response, converted) {
-  response.writeHead(200, {
-    "content-type": "text/event-stream",
-    "cache-control": "no-cache",
-    connection: "keep-alive",
-  });
-
-  for (const item of createSyntheticSseEvents(converted)) {
-    response.write(formatSseEvent(item.event, item.data));
-  }
-  response.write("data: [DONE]\n\n");
-  response.end();
 }
 
 function handleUpstreamError({ response, requestId, upstreamResponse, upstreamText, logger }) {

@@ -7,7 +7,7 @@ const token = process.env.DEEPINFRA_TOKEN;
 const model = process.env.DEEPINFRA_CODEX_SHIM_INTEGRATION_MODEL || "deepseek-ai/DeepSeek-V4-Flash";
 
 test(
-  "makes a harmless DeepInfra Responses-compatible request",
+  "makes a harmless streaming DeepInfra Responses-compatible request",
   { skip: token ? false : "Set DEEPINFRA_TOKEN to run the integration test." },
   async () => {
     const shim = await listen(
@@ -26,16 +26,15 @@ test(
         body: JSON.stringify({
           model,
           input: "Reply with exactly OK.",
-          stream: false,
           max_output_tokens: 8,
           temperature: 0,
         }),
       });
 
       assert.equal(response.statusCode, 200, response.body);
-      const parsed = JSON.parse(response.body);
-      assert.equal(parsed.object, "response");
-      assert.ok(parsed.output.length > 0);
+      assert.match(response.headers["content-type"], /text\/event-stream/);
+      assert.match(response.body, /event: response\.completed/);
+      assert.match(response.body, /data: \[DONE\]/);
     } finally {
       await shim.close();
     }
