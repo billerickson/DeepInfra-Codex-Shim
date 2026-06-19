@@ -1,0 +1,12 @@
+{
+  "model": "deepseek-ai/DeepSeek-V4-Flash",
+  "instructions": "Be concise.",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "Reply with exactly OK."
+    }
+  ],
+  "stream": false
+}

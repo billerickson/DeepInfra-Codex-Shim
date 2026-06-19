@@ -1,0 +1,47 @@
+{
+  "name": "deepinfra-codex-shim",
+  "version": "0.1.0",
+  "description": "Experimental local shim that lets Codex talk to DeepInfra chat completions through the Responses API shape.",
+  "license": "MIT",
+  "author": "Bill Erickson",
+  "homepage": "https://github.com/billerickson/DeepInfra-Codex-Shim#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/billerickson/DeepInfra-Codex-Shim.git"
+  },
+  "bugs": {
+    "url": "https://github.com/billerickson/DeepInfra-Codex-Shim/issues"
+  },
+  "type": "module",
+  "bin": {
+    "deepinfra-codex-shim": "./bin/deepinfra-codex-shim.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "start": "node ./bin/deepinfra-codex-shim.js",
+    "test": "node --test test/responses-to-chat.test.mjs test/chat-to-responses.test.mjs test/server.test.mjs",
+    "test:integration": "node --test test/integration.test.mjs",
+    "lint": "node --check bin/deepinfra-codex-shim.js && node --check src/cli.mjs && node --check src/config.mjs && node --check src/logging.mjs && node --check src/responses-to-chat.mjs && node --check src/chat-to-responses.mjs && node --check src/server.mjs",
+    "prepublishOnly": "npm run lint && npm test"
+  },
+  "keywords": [
+    "codex",
+    "deepinfra",
+    "responses-api",
+    "chat-completions",
+    "openai-compatible",
+    "shim"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
