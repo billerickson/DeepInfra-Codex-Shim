@@ -4,6 +4,8 @@ Codex currently sends Responses API requests. DeepInfra's OpenAI-compatible endp
 
 This is experimental. It is not a full Responses API implementation. It is a small compatibility layer for Codex CLI coding workflows that use text prompts, text responses, and function/tool calls.
 
+The one manual step is providing a DeepInfra API token. The shim reads it from `DEEPINFRA_TOKEN` by default, and Codex should use that same environment variable in its provider config. Everything else can be scripted by Codex or another local AI harness.
+
 ## What this is
 
 `deepinfra-codex-shim` starts a local HTTP server. Codex talks to the local server with `wire_api = "responses"`. The shim converts `POST /v1/responses` requests into DeepInfra `POST /chat/completions` requests, sends them upstream, and converts the result back into the Responses-shaped output Codex expects.
@@ -22,7 +24,8 @@ cd DeepInfra-Codex-Shim
 npm install
 npm test
 
-DEEPINFRA_TOKEN=... npm start -- --log-requests
+export DEEPINFRA_TOKEN="your_deepinfra_api_token"
+npm start -- --log-requests
 ```
 
 The server listens at:
@@ -48,7 +51,7 @@ curl http://127.0.0.1:8797/v1/chat/completions \
 
 ## Codex configuration
 
-Codex config formats may change, so treat this as a template:
+Use the same `DEEPINFRA_TOKEN` environment variable in Codex. Codex config formats may change, so treat this as a template:
 
 ```toml
 [model_providers.deepinfra]
@@ -66,6 +69,14 @@ codex --profile deepinfra --model deepseek-ai/DeepSeek-V4-Flash
 
 ## Environment variables
 
+Required:
+
+```text
+DEEPINFRA_TOKEN=...
+```
+
+Optional:
+
 ```text
 DEEPINFRA_CODEX_SHIM_HOST=127.0.0.1
 DEEPINFRA_CODEX_SHIM_PORT=8797
@@ -77,7 +88,6 @@ DEEPINFRA_CODEX_SHIM_LOG_REQUESTS=false
 DEEPINFRA_CODEX_SHIM_TIMEOUT_MS=120000
 DEEPINFRA_CODEX_SHIM_MAX_BODY_BYTES=10485760
 DEEPINFRA_CODEX_SHIM_COMPAT_DROP_TOOL_CALL_CONTENT=false
-DEEPINFRA_TOKEN=...
 ```
 
 Equivalent CLI flags:
