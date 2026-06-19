@@ -1,6 +1,6 @@
 # DeepInfra Codex Shim
 
-Codex currently sends Responses API requests. DeepInfra's OpenAI-compatible endpoint accepts chat completions requests. This shim runs locally and translates between those formats so Codex can test DeepInfra-hosted models.
+Codex currently sends Responses API requests. DeepInfra's OpenAI-compatible endpoint accepts chat completions requests. This shim runs locally and translates between those formats so Codex can use DeepInfra-hosted models.
 
 This is experimental. It is not a full Responses API implementation. It is a small compatibility layer for Codex CLI coding workflows that use text prompts, text responses, and function/tool calls.
 
@@ -130,7 +130,7 @@ DeepInfra models differ in tool-call behavior. If a model does not reliably emit
 
 ## Compatibility flags
 
-The original benchmark helper dropped assistant text whenever a tool call was present. That behavior can help with some Codex/tool-call turns, but it is surprising for general use, so it is now opt-in:
+There is an opt-in flag to drop assistant text whenever a tool call is present. This behavior can help with some Codex/tool-call turns:
 
 ```bash
 deepinfra-codex-shim --compat-drop-tool-call-content
@@ -156,8 +156,6 @@ Tokens and authorization headers are redacted from structured logs and upstream 
 
 Keep the shim bound to `127.0.0.1` unless you have a specific reason to expose it elsewhere. The shim does not implement authentication beyond forwarding provider credentials upstream.
 
-Codex may send repository context, file contents, diffs, commands, command output, and task prompts to the selected model provider. Do not use this with private client code unless you are comfortable sending that context to DeepInfra and the selected model provider.
-
 The shim does not store API keys. It reads the token from `DEEPINFRA_TOKEN` by default, or from the variable named by `DEEPINFRA_CODEX_SHIM_API_KEY_ENV`.
 
 ## Troubleshooting
@@ -177,10 +175,6 @@ If requests hang, lower the timeout while debugging:
 ```bash
 deepinfra-codex-shim --timeout-ms 30000
 ```
-
-## Benchmark context
-
-This shim was created for a Codex benchmark where Codex needed to evaluate DeepInfra-hosted models. The goal was practical compatibility, not a general-purpose Responses API server.
 
 ## Development
 
